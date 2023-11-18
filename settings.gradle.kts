@@ -10,3 +10,5 @@ plugins {
 }
 
 rootProject.name = "Abrezk"
+include("src:resourcepack-converter")
+findProject(":src:resourcepack-converter")?.name = "resourcepack-converter"

@@ -36,17 +36,17 @@
 
 ~~_扁平化怎么改了这么多啊啊啊啊啊_~~
 
-~~我提供了`/src/main/resources/flattening.map`，在这个文件中，我手动录入了所有的新旧材质文件名映射。~~
+~~我准备提供一个表，我将会在这个表中手动录入所有的新旧材质文件名映射~~
 
 录了几行我发现Copilot的补全似乎过于强大了，所以我开始去GitHub上寻觅...
 
 然后我找到了[simple-name-converter](https://github.com/kotmatross28729/simple-name-converter)这个项目，它提供了一个`names.txt`文件，里面包含了所有的新旧材质文件名映射。
 
-我修改格式后，将其放入了`/src/main/resources/flattening.map`中。
+我修改格式后，将其放入了`src/resourcepack-converter/src/main/kotlin/cn/xor7/abrezk/FlatteningMap.kt`中。
 
-文件中每一行表示一组映射，格式为`新材质名 旧材质名`，中间用空格隔开，不包含后缀名(全都是png)。
+代码中`init`块的中的`map`键值，每一行表示一组映射，格式为`新材质名 旧材质名`，中间用空格隔开，不包含后缀名(全都是png)。
 
-当然，如果材质名没变动，文件中自然是没有的。
+当然，如果材质名没变动，表中自然是没有的。
 
 ### 1.15
 

@@ -1,58 +1,128 @@
 package cn.xor7.abrezk
 
-import java.io.*
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.nio.file.Files
-import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-object ResourcepackConverter {
-    fun convert(input: ZipInputStream): ZipOutputStream {
-        input.use { inputSteam ->
-            ByteArrayOutputStream().use { byteArrayOutputStream ->
-                ZipOutputStream(byteArrayOutputStream).use { zipOutputStream ->
-                    println("笑死，啥也没做呢")
-                    return zipOutputStream
-                }
-            }
+class ResourcepackConverter private constructor() {
+    private val cacheDir = Files.createTempDirectory("abrezk-resourcepack-converter").toFile()
+
+    companion object {
+        fun create(): ResourcepackConverter {
+            return ResourcepackConverter()
         }
     }
 
-    fun convert(inputFolder: Path): ZipOutputStream {
-        try {
+    init {
+        cacheDir.deleteOnExit()
+    }
+
+    fun convert(inputFolder: String, outputFile: File) {
+        convert(inputFolder, cacheDir.absolutePath)
+        compressionFromCacheDir(outputFile)
+    }
+
+    fun convert(inputFolder: String, outputFolder: String) {
+        val input = File(inputFolder)
+        val output = File(outputFolder)
+        if (!input.exists()) {
+            throw Exception("Input folder does not exist")
+        }
+        input.walk().forEach { file ->
+            when {
+                file.absolutePath.startsWith("assets\\minecraft\\textures\\items\\") -> {
+                    println(file.absolutePath)
+                }
+            }
+        }
+        if (!output.exists()) {
+            output.mkdirs()
+        }
+    }
+
+    fun convert(inputFile: File, outputFile: File) {
+        decompressionToCacheDir(inputFile)
+        convert(cacheDir.absolutePath, "${cacheDir.absolutePath}-convert")
+    }
+
+    fun convert(inputFile: File, outputFolder: String) {
+        decompressionToCacheDir(inputFile)
+        convert(cacheDir.absolutePath, outputFolder)
+    }
+
+    private fun convert0(input: ZipInputStream): ByteArrayOutputStream {
+        input.use { zipInputStream ->
             ByteArrayOutputStream().use { byteArrayOutputStream ->
                 ZipOutputStream(byteArrayOutputStream).use { zipOutputStream ->
                     zipOutputStream.setMethod(ZipOutputStream.STORED)
-                    Files.walk(inputFolder)
-                        .filter { Files.isRegularFile(it) }
-                        .forEach { filePath ->
-                            try {
-                                val entryName = "${inputFolder.toAbsolutePath()}${File.separator}${filePath.fileName}"
-                                val entry = ZipEntry(entryName)
-                                zipOutputStream.putNextEntry(entry)
-
-                                val buffer = ByteArray(1024)
-                                FileInputStream(filePath.toFile()).use { fileInputStream ->
-                                    var bytesRead: Int
-                                    while (fileInputStream.read(buffer).also { bytesRead = it } != -1) {
-                                        zipOutputStream.write(buffer, 0, bytesRead)
-                                    }
-                                }
-
-                                zipOutputStream.closeEntry()
-                            } catch (e: IOException) {
-                                e.printStackTrace()
+                    var zipEntry: ZipEntry? = zipInputStream.nextEntry
+                    while (zipEntry != null) {
+                        val entryFilePath = zipEntry.name
+                        when {
+                            entryFilePath.startsWith("minecraft\\textures\\items\\") -> {
+                                println(entryFilePath)
                             }
                         }
 
-                    byteArrayOutputStream.close()
-                    zipOutputStream.close()
-                    return convert(ZipInputStream(ByteArrayInputStream(byteArrayOutputStream.toByteArray())))
+                        zipInputStream.closeEntry()
+                        zipEntry = zipInputStream.nextEntry
+                    }
+                    return byteArrayOutputStream
                 }
             }
-        } catch (e: IOException) {
-            throw e
         }
     }
+
+    private fun decompressionToCacheDir(inputFile: File) {
+        val buffer = ByteArray(1024)
+        ZipInputStream(FileInputStream(inputFile)).use { zipInputStream ->
+            var zipEntry: ZipEntry? = zipInputStream.nextEntry
+            while (zipEntry != null) {
+                val entryFilePath = cacheDir.absolutePath + File.separator + zipEntry.name
+
+                if (zipEntry.isDirectory) {
+                    File(entryFilePath).mkdirs()
+                } else {
+                    FileOutputStream(entryFilePath).use { outputStream ->
+                        var len: Int
+                        while (zipInputStream.read(buffer).also { len = it } > 0) {
+                            outputStream.write(buffer, 0, len)
+                        }
+                    }
+                }
+                zipInputStream.closeEntry()
+                zipEntry = zipInputStream.nextEntry
+            }
+        }
+    }
+
+    private fun compressionFromCacheDir(outputFile: File) {
+        val buffer = ByteArray(1024)
+        ZipOutputStream(FileOutputStream(outputFile)).use { zipOutputStream ->
+            try {
+                cacheDir.walk().forEach { file ->
+                    if (file.isFile) {
+                        val zipEntry = ZipEntry(file.absolutePath.substring(cacheDir.absolutePath.length + 1))
+                        zipOutputStream.putNextEntry(zipEntry)
+                        FileInputStream(file).use { inputStream ->
+                            var len: Int
+                            while (inputStream.read(buffer).also { len = it } > 0) {
+                                zipOutputStream.write(buffer, 0, len)
+                            }
+                        }
+                        zipOutputStream.closeEntry()
+                    }
+                }
+            } catch (e: Exception) {
+                // 适当处理异常（记录或抛出）
+                e.printStackTrace()
+            }
+        }
+    }
+
 }

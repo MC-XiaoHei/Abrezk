@@ -5,9 +5,12 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.copyToRecursively
 
 class ResourcepackConverter private constructor() {
     private val cacheDir = Files.createTempDirectory("abrezk-resourcepack-converter").toFile()
@@ -24,7 +27,7 @@ class ResourcepackConverter private constructor() {
 
     fun convert(inputFolder: String, outputFile: File) {
         convert(inputFolder, cacheDir.absolutePath)
-        compressionFromCacheDir(outputFile)
+        saveToZipFile(outputFile)
     }
 
     fun convert(inputFolder: String, outputFolder: String) {
@@ -46,12 +49,12 @@ class ResourcepackConverter private constructor() {
     }
 
     fun convert(inputFile: File, outputFile: File) {
-        decompressionToCacheDir(inputFile)
+        loadZipFile(inputFile)
         convert(cacheDir.absolutePath, "${cacheDir.absolutePath}-convert")
     }
 
     fun convert(inputFile: File, outputFolder: String) {
-        decompressionToCacheDir(inputFile)
+        loadZipFile(inputFile)
         convert(cacheDir.absolutePath, outputFolder)
     }
 
@@ -78,7 +81,7 @@ class ResourcepackConverter private constructor() {
         }
     }
 
-    private fun decompressionToCacheDir(inputFile: File) {
+    private fun loadZipFile(inputFile: File) {
         val buffer = ByteArray(1024)
         ZipInputStream(FileInputStream(inputFile)).use { zipInputStream ->
             var zipEntry: ZipEntry? = zipInputStream.nextEntry
@@ -101,28 +104,32 @@ class ResourcepackConverter private constructor() {
         }
     }
 
-    private fun compressionFromCacheDir(outputFile: File) {
+    @OptIn(ExperimentalPathApi::class)
+    private fun loadFolder(folder: String) {
+        Paths.get(folder).copyToRecursively(cacheDir.toPath(), followLinks = true, overwrite = true)
+    }
+
+    private fun saveToZipFile(outputFile: File) {
         val buffer = ByteArray(1024)
         ZipOutputStream(FileOutputStream(outputFile)).use { zipOutputStream ->
-            try {
-                cacheDir.walk().forEach { file ->
-                    if (file.isFile) {
-                        val zipEntry = ZipEntry(file.absolutePath.substring(cacheDir.absolutePath.length + 1))
-                        zipOutputStream.putNextEntry(zipEntry)
-                        FileInputStream(file).use { inputStream ->
-                            var len: Int
-                            while (inputStream.read(buffer).also { len = it } > 0) {
-                                zipOutputStream.write(buffer, 0, len)
-                            }
+            cacheDir.walk().forEach { file ->
+                if (file.isFile) {
+                    val zipEntry = ZipEntry(file.absolutePath.substring(cacheDir.absolutePath.length + 1))
+                    zipOutputStream.putNextEntry(zipEntry)
+                    FileInputStream(file).use { inputStream ->
+                        var len: Int
+                        while (inputStream.read(buffer).also { len = it } > 0) {
+                            zipOutputStream.write(buffer, 0, len)
                         }
-                        zipOutputStream.closeEntry()
                     }
+                    zipOutputStream.closeEntry()
                 }
-            } catch (e: Exception) {
-                // 适当处理异常（记录或抛出）
-                e.printStackTrace()
             }
         }
     }
 
+    @OptIn(ExperimentalPathApi::class)
+    private fun saveToFolder(outputFolder: String) {
+        cacheDir.toPath().copyToRecursively(Paths.get(outputFolder), followLinks = true, overwrite = true)
+    }
 }

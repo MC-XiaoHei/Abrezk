@@ -1,5 +1,6 @@
 package cn.xor7.abrezk
 
+@Suppress("SpellCheckingInspection")
 object FlatteningMap {
     fun toFlatName(name: String): String {
         return normalMap[name] ?: name

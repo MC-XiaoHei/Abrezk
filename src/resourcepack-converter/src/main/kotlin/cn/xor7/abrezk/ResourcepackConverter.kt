@@ -1,6 +1,5 @@
 package cn.xor7.abrezk
 
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -25,57 +24,39 @@ class ResourcepackConverter private constructor() {
         cacheDir.deleteOnExit()
     }
 
+    @Suppress("unused")
     fun convert(inputFolder: String, outputFile: File) {
-        convert(inputFolder, cacheDir.absolutePath)
+        loadFolder(inputFolder)
+        convert0()
         saveToZipFile(outputFile)
     }
 
+    @Suppress("unused")
     fun convert(inputFolder: String, outputFolder: String) {
-        val input = File(inputFolder)
-        val output = File(outputFolder)
-        if (!input.exists()) {
-            throw Exception("Input folder does not exist")
-        }
-        input.walk().forEach { file ->
+        loadFolder(inputFolder)
+        convert0()
+        saveToFolder(outputFolder)
+    }
+
+    @Suppress("unused")
+    fun convert(inputFile: File, outputFile: File) {
+        loadZipFile(inputFile)
+        convert0()
+        saveToZipFile(outputFile)
+    }
+
+    @Suppress("unused")
+    fun convert(inputFile: File, outputFolder: String) {
+        loadZipFile(inputFile)
+        convert0()
+        saveToFolder(outputFolder)
+    }
+
+    private fun convert0(){
+        cacheDir.walk().forEach { file ->
             when {
                 file.absolutePath.startsWith("assets\\minecraft\\textures\\items\\") -> {
                     println(file.absolutePath)
-                }
-            }
-        }
-        if (!output.exists()) {
-            output.mkdirs()
-        }
-    }
-
-    fun convert(inputFile: File, outputFile: File) {
-        loadZipFile(inputFile)
-        convert(cacheDir.absolutePath, "${cacheDir.absolutePath}-convert")
-    }
-
-    fun convert(inputFile: File, outputFolder: String) {
-        loadZipFile(inputFile)
-        convert(cacheDir.absolutePath, outputFolder)
-    }
-
-    private fun convert0(input: ZipInputStream): ByteArrayOutputStream {
-        input.use { zipInputStream ->
-            ByteArrayOutputStream().use { byteArrayOutputStream ->
-                ZipOutputStream(byteArrayOutputStream).use { zipOutputStream ->
-                    zipOutputStream.setMethod(ZipOutputStream.STORED)
-                    var zipEntry: ZipEntry? = zipInputStream.nextEntry
-                    while (zipEntry != null) {
-                        val entryFilePath = zipEntry.name
-                        when {
-                            entryFilePath.startsWith("minecraft\\textures\\items\\") -> {
-                                println(entryFilePath)
-                            }
-                        }
-
-                        zipInputStream.closeEntry()
-                        zipEntry = zipInputStream.nextEntry
-                    }
-                    return byteArrayOutputStream
                 }
             }
         }
@@ -106,6 +87,10 @@ class ResourcepackConverter private constructor() {
 
     @OptIn(ExperimentalPathApi::class)
     private fun loadFolder(folder: String) {
+        val input = File(folder)
+        if (!input.exists()) {
+            throw Exception("Input folder does not exist")
+        }
         Paths.get(folder).copyToRecursively(cacheDir.toPath(), followLinks = true, overwrite = true)
     }
 
@@ -130,6 +115,9 @@ class ResourcepackConverter private constructor() {
 
     @OptIn(ExperimentalPathApi::class)
     private fun saveToFolder(outputFolder: String) {
+        if(!File(outputFolder).exists()){
+            File(outputFolder).mkdirs()
+        }
         cacheDir.toPath().copyToRecursively(Paths.get(outputFolder), followLinks = true, overwrite = true)
     }
 }

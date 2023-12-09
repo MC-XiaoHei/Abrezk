@@ -13,6 +13,7 @@ import kotlin.io.path.copyToRecursively
 
 class ResourcepackConverter private constructor() {
     private val cacheDir = Files.createTempDirectory("abrezk-resourcepack-converter").toFile()
+    private val suffix = ".png"
 
     companion object {
         fun create(): ResourcepackConverter {
@@ -54,11 +55,11 @@ class ResourcepackConverter private constructor() {
 
     private fun convert0(){
         cacheDir.walk().forEach { file ->
-            when {
-                file.absolutePath.startsWith("assets\\minecraft\\textures\\items\\") -> {
-                    println(file.absolutePath)
-                }
-            }
+            if(!file.isFile || !file.name.endsWith(suffix)) return@forEach
+            val flatteningName = FlatteningMap.toFlatName(file.name.removeSuffix(suffix)).plus(suffix)
+            if(flatteningName == file.name) return@forEach
+            println("convert ${file.name} to $flatteningName")
+            file.renameTo(File(file.absolutePath.replace(file.name,flatteningName)))
         }
     }
 

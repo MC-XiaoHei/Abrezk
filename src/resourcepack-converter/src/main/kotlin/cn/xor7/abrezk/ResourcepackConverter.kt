@@ -1,5 +1,7 @@
 package cn.xor7.abrezk
 
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -11,18 +13,17 @@ import java.util.zip.ZipOutputStream
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.copyToRecursively
 
-class ResourcepackConverter private constructor() {
-    private val cacheDir = Files.createTempDirectory("abrezk-resourcepack-converter").toFile()
+class ResourcepackConverter(
+    private val destFormat: Int,
+    private val cacheDir: File = Files.createTempDirectory("abrezk-resourcepack-converter").toFile(),
+    deleteCacheDirOnExit: Boolean = true,
+) {
     private val suffix = ".png"
 
-    companion object {
-        fun create(): ResourcepackConverter {
-            return ResourcepackConverter()
-        }
-    }
-
     init {
-        cacheDir.deleteOnExit()
+        if (deleteCacheDirOnExit) {
+            cacheDir.deleteOnExit()
+        }
     }
 
     @Suppress("unused")
@@ -53,13 +54,32 @@ class ResourcepackConverter private constructor() {
         saveToFolder(outputFolder)
     }
 
-    private fun convert0(){
+    // 你可以在创建对象时指定deleteCacheDirOnExit参数为false，然后直接调用此函数以避免复制文件带来的io开销
+    // You can specify the deleteCacheDirOnExit parameter as false when creating the object, and then call this function directly to avoid the io overhead of copying files.
+    @Suppress("MemberVisibilityCanBePrivate")
+    fun convert0() {
+        println("convert start. destFormat: $destFormat")
+
+    }
+
+    private fun parsePackMcmeta() {
+        val packMcmetaFile = File(cacheDir, "pack.mcmeta")
+        if (!packMcmetaFile.exists()) {
+            throw IllegalResourcepackException("pack.mcmeta not found")
+        }
+        val packMcmeta = Json.decodeFromString<PackMeta>(packMcmetaFile.readText())
+        if (packMcmeta.pack_format == destFormat) return
+        packMcmeta.pack_format = destFormat
+        packMcmetaFile.writeText(Json.encodeToString(packMcmeta))
+    }
+
+    private fun flattening() {
         cacheDir.walk().forEach { file ->
-            if(!file.isFile || !file.name.endsWith(suffix)) return@forEach
+            if (!file.isFile || !file.name.endsWith(suffix)) return@forEach
             val flatteningName = FlatteningMap.toFlatName(file.name.removeSuffix(suffix)).plus(suffix)
-            if(flatteningName == file.name) return@forEach
-            println("convert ${file.name} to $flatteningName")
-            file.renameTo(File(file.absolutePath.replace(file.name,flatteningName)))
+            if (flatteningName == file.name) return@forEach
+            println("flattening: rename ${file.name} to $flatteningName")
+            file.renameTo(File(file.absolutePath.replace(file.name, flatteningName)))
         }
     }
 
@@ -116,7 +136,7 @@ class ResourcepackConverter private constructor() {
 
     @OptIn(ExperimentalPathApi::class)
     private fun saveToFolder(outputFolder: String) {
-        if(!File(outputFolder).exists()){
+        if (!File(outputFolder).exists()) {
             File(outputFolder).mkdirs()
         }
         cacheDir.toPath().copyToRecursively(Paths.get(outputFolder), followLinks = true, overwrite = true)

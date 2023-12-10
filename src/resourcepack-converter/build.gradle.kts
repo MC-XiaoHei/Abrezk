@@ -1,6 +1,7 @@
 plugins {
     `maven-publish`
     kotlin("jvm") version "1.9.0"
+    kotlin("plugin.serialization") version "1.9.0"
 }
 
 group = "cn.xor7.abrezk"
@@ -11,6 +12,7 @@ repositories {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.6.2")
 }
 
 kotlin {

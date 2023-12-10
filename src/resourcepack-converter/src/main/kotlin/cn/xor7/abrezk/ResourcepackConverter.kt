@@ -20,6 +20,7 @@ class ResourcepackConverter(
     deleteCacheDirOnExit: Boolean = true,
 ) {
     private val suffix = ".png"
+    private val json = Json { ignoreUnknownKeys = true }
     private var srcFormat by Delegates.notNull<Int>()
 
     init {
@@ -60,7 +61,7 @@ class ResourcepackConverter(
     // You can specify the deleteCacheDirOnExit parameter as false when creating the object, and then call this function directly to avoid the io overhead of copying files.
     @Suppress("MemberVisibilityCanBePrivate")
     fun convert0() {
-        println("convert start. destFormat: $destFormat")
+        println("destFormat: $destFormat")
         parsePackMcmeta()
         when {
             srcFormat < destFormat -> {
@@ -89,11 +90,12 @@ class ResourcepackConverter(
         if (!packMcmetaFile.exists()) {
             throw IllegalResourcepackException("pack.mcmeta not found")
         }
-        val packMcmeta = Json.decodeFromString<PackMeta>(packMcmetaFile.readText())
-        if (packMcmeta.pack_format == destFormat) return
-        packMcmeta.pack_format = destFormat
-        srcFormat = packMcmeta.pack_format
-        packMcmetaFile.writeText(Json.encodeToString(packMcmeta))
+        val packMcmeta = json.decodeFromString<PackMeta>(packMcmetaFile.readText())
+        if (packMcmeta.pack.pack_format == destFormat) return
+        srcFormat = packMcmeta.pack.pack_format
+        println("src format: $srcFormat")
+        packMcmeta.pack.pack_format = destFormat
+        packMcmetaFile.writeText(json.encodeToString(packMcmeta))
     }
 
 

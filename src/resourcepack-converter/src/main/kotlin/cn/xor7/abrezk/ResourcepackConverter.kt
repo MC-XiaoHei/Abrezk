@@ -12,6 +12,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.copyToRecursively
+import kotlin.properties.Delegates
 
 class ResourcepackConverter(
     private val destFormat: Int,
@@ -19,6 +20,7 @@ class ResourcepackConverter(
     deleteCacheDirOnExit: Boolean = true,
 ) {
     private val suffix = ".png"
+    private var srcFormat by Delegates.notNull<Int>()
 
     init {
         if (deleteCacheDirOnExit) {
@@ -59,10 +61,30 @@ class ResourcepackConverter(
     @Suppress("MemberVisibilityCanBePrivate")
     fun convert0() {
         println("convert start. destFormat: $destFormat")
+        parsePackMcmeta()
+        when {
+            srcFormat < destFormat -> {
+                for (i in srcFormat..<destFormat) {
+                    when (i) {
+                        3 -> flattening()
+                    }
+                }
+            }
 
+            srcFormat > destFormat -> {
+                for (i in srcFormat downTo destFormat + 1) {
+                    when (i) {
+                        2 -> antiFlattening()
+                    }
+                }
+            }
+
+            else -> return
+        }
     }
 
     private fun parsePackMcmeta() {
+        println("parse pack.mcmeta")
         val packMcmetaFile = File(cacheDir, "pack.mcmeta")
         if (!packMcmetaFile.exists()) {
             throw IllegalResourcepackException("pack.mcmeta not found")
@@ -70,18 +92,10 @@ class ResourcepackConverter(
         val packMcmeta = Json.decodeFromString<PackMeta>(packMcmetaFile.readText())
         if (packMcmeta.pack_format == destFormat) return
         packMcmeta.pack_format = destFormat
+        srcFormat = packMcmeta.pack_format
         packMcmetaFile.writeText(Json.encodeToString(packMcmeta))
     }
 
-    private fun flattening() {
-        cacheDir.walk().forEach { file ->
-            if (!file.isFile || !file.name.endsWith(suffix)) return@forEach
-            val flatteningName = FlatteningMap.toFlatName(file.name.removeSuffix(suffix)).plus(suffix)
-            if (flatteningName == file.name) return@forEach
-            println("flattening: rename ${file.name} to $flatteningName")
-            file.renameTo(File(file.absolutePath.replace(file.name, flatteningName)))
-        }
-    }
 
     private fun loadZipFile(inputFile: File) {
         val buffer = ByteArray(1024)
@@ -140,5 +154,25 @@ class ResourcepackConverter(
             File(outputFolder).mkdirs()
         }
         cacheDir.toPath().copyToRecursively(Paths.get(outputFolder), followLinks = true, overwrite = true)
+    }
+
+    private fun flattening() {
+        cacheDir.walk().forEach { file ->
+            if (!file.isFile || !file.name.endsWith(suffix)) return@forEach
+            val flatteningName = FlatteningMap.toFlatName(file.name.removeSuffix(suffix)).plus(suffix)
+            if (flatteningName == file.name) return@forEach
+            println("flattening: rename ${file.name} to $flatteningName")
+            file.renameTo(File(file.absolutePath.replace(file.name, flatteningName)))
+        }
+    }
+
+    private fun antiFlattening() {
+        cacheDir.walk().forEach { file ->
+            if (!file.isFile || !file.name.endsWith(suffix)) return@forEach
+            val antiFlatteningName = FlatteningMap.fromFlatName(file.name.removeSuffix(suffix)).plus(suffix)
+            if (antiFlatteningName == file.name) return@forEach
+            println("anti flattening: rename ${file.name} to $antiFlatteningName")
+            file.renameTo(File(file.absolutePath.replace(file.name, antiFlatteningName)))
+        }
     }
 }

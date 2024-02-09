@@ -1,4 +1,4 @@
-package cn.xor7.abrezk
+package cn.xor7.abrezk.resourcepack.convertor
 
 @Suppress("SpellCheckingInspection")
 object FlatteningMap {
